@@ -62,7 +62,7 @@ botraters.iloc[:20]
 
 #Q7
 
-mask1 = (rater_goodness["total"] >= 1)
+mask1 = (rater_goodness["total"] > 1)
 firstset = rater_goodness[mask1].sort_values(by = "total", ascending = False)
 top = round(0.25*269)
 topset = firstset.iloc[:top]
