@@ -63,8 +63,8 @@ botraters.iloc[:20]
 #Q7
 
 mask1 = (rater_goodness["total"] >= 1)
-firstset = rater_goodness[mask].sort_values(by = "total", ascending = False)
-top = round(0.25*217)
+firstset = rater_goodness[mask1].sort_values(by = "total", ascending = False)
+top = round(0.25*269)
 topset = firstset.iloc[:top]
 
 turks = topset.index
@@ -108,7 +108,7 @@ result_75 = pd.DataFrame(data1,index = table.index)
 #Q9 
 # same as Q7 but with different quartile
 
-top = round(0.75*217)
+top = round(0.75*269)
 topset = firstset.iloc[:top]
 
 turks = topset.index
