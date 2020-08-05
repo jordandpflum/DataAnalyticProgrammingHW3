@@ -154,6 +154,7 @@ subset["counts"] = 1
 
 table2 = pd.pivot_table(subset,index = "reliable",columns = "less reliable", values = "counts", aggfunc = sum)
 
+
 # Most errors are when the reliable set rates G and unreliable rates P
 
 
