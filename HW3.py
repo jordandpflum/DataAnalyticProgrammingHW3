@@ -62,7 +62,7 @@ botraters.iloc[:20]
 
 #Q7
 
-mask1 = (rater_goodness["total"] >= 1)
+mask1 = (rater_goodness["total"] > 1)
 firstset = rater_goodness[mask1].sort_values(by = "total", ascending = False)
 top = round(0.25*269)
 topset = firstset.iloc[:top]
@@ -153,6 +153,7 @@ subset = total[["reliable","less reliable"]]
 subset["counts"] = 1
 
 table2 = pd.pivot_table(subset,index = "reliable",columns = "less reliable", values = "counts", aggfunc = sum)
+
 
 # Most errors are when the reliable set rates G and unreliable rates P
 
