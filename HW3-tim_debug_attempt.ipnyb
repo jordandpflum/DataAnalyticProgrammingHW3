@@ -1,0 +1,706 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Group Members\n",
+    "- Pflum, Jordan\n",
+    "- Cheng, Tim\n",
+    "- Girtharan, Mervyn"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Logistics\n",
+    "You must create one Jupyter notebook for the entire assignment, and upload\n",
+    "it to Canvas by **August 6, before class begins.**"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Introduction\n",
+    "Suppose we have a bunch of URLs and we want to know their adult-rating\n",
+    "(i.e., is the url P, or G, or X, or R). This task is dificult for computers,\n",
+    "but easy for humans, and this has led to the growth of crowdsourcing: get\n",
+    "a bunch of humans to give ratings to urls, but use automated techniques to\n",
+    "figure out how much to trust each person's ratings.\n",
+    " \n",
+    "We are going to use the data from a paper by Ipeirotis et al. available\n",
+    "here. This details an experiment run on Amazon's Mechanical Turk crowd-\n",
+    "sourcing system. They ask a bunch of raters (called \"turks\") to rate several\n",
+    "urls, but they already know the answers (the true categories) for a few urls,\n",
+    "called the \"gold set\". The ratings of the turks on the gold set thus allows us\n",
+    "to judge their accuracy."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q1 (10pts) Read in data\n",
+    "Read in the files gold.txt and labels.txt. The gold DataFrame should\n",
+    "have columns url and category, while the labels DataFrame should have\n",
+    "columns turk, url and category. You will have to pick the right separator."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "\n",
+    "# Read in Gold Set and Labels Set\n",
+    "goldData = pd.read_csv('gold.txt', names=['url','category'],delimiter='\\t')\n",
+    "labelsData = pd.read_csv('labels.txt', names=['turk', 'url', 'category'],delimiter='\\t')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q2 (10pts) Split into two DataFrames\n",
+    "Split the labels DataFrame into two: labels_on_gold and labels_unknown,\n",
+    "the former containing all rows where the url is present in the gold set, and\n",
+    "the latter one contains all remaining rows of labels."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 67,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "                turk                   url category_gold category_turk\n",
+      "3319  A35CBDDGBM7T6E  http://yousendit.com             G             G\n",
+      "3320  A3J86MK3VIE6ST  http://yousendit.com             G             G\n",
+      "3321   A4GP97LAQCCHJ  http://yousendit.com             G             G\n",
+      "3322   AAQNUEUU7H1Y5  http://yousendit.com             G             G\n",
+      "3323   ANC9EWZTGN5HK  http://yousendit.com             G             G\n",
+      "                 turk               url category\n",
+      "0      A1OT3A29R9N1DG     http://000.cc        P\n",
+      "1      A1PXXEOGQ76RNJ     http://000.cc        G\n",
+      "2      A1PXXEOGQ76RNJ     http://000.cc        G\n",
+      "3      A21US576U8SCO4     http://000.cc        G\n",
+      "4      A2LGX47NN7C5D3     http://000.cc        G\n",
+      "...               ...               ...      ...\n",
+      "89392   AFHMR93GDJCGT  http://zz868.com        G\n",
+      "89393  A13F119AMOA54H     http://zzx.cc        X\n",
+      "89394  A1S0C0EB7A6FFM     http://zzx.cc        P\n",
+      "89395  A21US576U8SCO4     http://zzx.cc        G\n",
+      "89396  A29T6EIMK6R7O0     http://zzx.cc        X\n",
+      "\n",
+      "[89397 rows x 3 columns]\n",
+      "False\n",
+      "False\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Create Dataframe of Lables in Gold Set\n",
+    "labels_on_gold = pd.merge(goldData, labelsData, how='inner', on=['url'])\n",
+    "labels_on_gold = labels_on_gold.reset_index()[['turk', 'url', 'category_x', 'category_y']]\n",
+    "labels_on_gold = labels_on_gold.rename(columns={'turk': 'turk', \n",
+    "                                                'url': 'url', \n",
+    "                                                'category_x': 'category_gold', \n",
+    "                                                'category_y': 'category_turk'})\n",
+    "\n",
+    "# Create Dataframe of Lables not in Gold Set\n",
+    "labels_unknown = pd.merge(labelsData, goldData, on=['url'],how=\"outer\",indicator=True)\n",
+    "labels_unknown = labels_unknown[labels_unknown['_merge']=='left_only']\n",
+    "labels_unknown = labels_unknown.reset_index()[['turk', 'url', 'category_x']]\n",
+    "labels_unknown = labels_unknown.rename(columns={'turk': 'turk', 'url': 'url', 'category_x': 'category'})\n",
+    "\n",
+    "\n",
+    "print(labels_on_gold.tail())\n",
+    "print(labels_unknown)\n",
+    "\n",
+    "print(\"A2Z03CBVWPF9IZ\" in labels_on_gold[\"turk\"])\n",
+    "print(\"A12CY1Q7XKJJDE\" in labels_on_gold[\"turk\"])\n",
+    "#print(labels_unknown.head())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q3 (10pts) Compute Accuracies of turks\n",
+    "Create a rater_goodness DataFrame that is indexed by turk, and has two\n",
+    "columns: the number of ratings, and the average correctness of ratings for\n",
+    "each turk (both on gold set urls)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 73,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "A31OCN4MNHUQ6W    184\n",
+      "A153PKAL7OAY36    148\n",
+      "A2BTR0GQ5B5JI6    126\n",
+      "ATVALOQVDCMZW     103\n",
+      "AZSDW7JJL5VA7     100\n",
+      "                 ... \n",
+      "A2LHJ46PIDENG0      1\n",
+      "A12CY1Q7XKJJDE      1\n",
+      "A1IPNI2RIHO465      1\n",
+      "A2O0NMJICH2VK3      1\n",
+      "A2Z03CBVWPF9IZ      1\n",
+      "Name: turk, Length: 269, dtype: int64\n",
+      "False\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Get Total number ratings per turk\n",
+    "\n",
+    "labels_on_gold_turk_total = labels_on_gold['turk'].value_counts()\n",
+    "#labels_on_gold_turk_total = labels_on_gold_turk_total.rename(\"numRatings\")\n",
+    "\n",
+    "print(labels_on_gold_turk_total)\n",
+    "\n",
+    "\n",
+    "test = labels_on_gold['turk']\n",
+    "print(\"A2Z03CBVWPF9IZ\" in test)\n",
+    "\n",
+    "# Get total ratings correct per turk\n",
+    "labels_on_gold_correct = labels_on_gold[labels_on_gold['category_gold'] == labels_on_gold['category_turk']]\n",
+    "labels_on_gold_correct_count = labels_on_gold_correct['turk'].value_counts()\n",
+    "\n",
+    "#print(labels_on_gold_correct)\n",
+    "\n",
+    "# Get total correct ratings percent (adjusting null values to 0 - turk did not rate any gold set correctly)\n",
+    "labels_on_gold_correct_percent = labels_on_gold_correct_count / labels_on_gold_turk_total\n",
+    "labels_on_gold_correct_percent[labels_on_gold_correct_percent.isnull()] = 0\n",
+    "labels_on_gold_correct_percent = labels_on_gold_correct_percent.rename(\"avgCorrectness\")\n",
+    "\n",
+    "# Merge Dataframes\n",
+    "rater_goodness = pd.concat([labels_on_gold_turk_total, labels_on_gold_correct_percent], axis=1)\n",
+    "\n",
+    "#print(rater_goodness.tail())\n",
+    "#print(len(rater_goodness))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q4 Odds Ratios\n",
+    "If someone is correct $p$ fraction of the time, the *odds* of success are defined as: $$\\mbox{odds } = \\frac{p}{1.001 - p}$$ Attach a column called *odds* to the *rater_goodness* DataFrame, using the average correctness of the turk as his or her *p*."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 44,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "                numRatings  avgCorrectness         odds\n",
+      "A31OCN4MNHUQ6W         184        0.777174     3.472222\n",
+      "A153PKAL7OAY36         148        0.722973     2.600369\n",
+      "A2BTR0GQ5B5JI6         126        0.523810     1.097695\n",
+      "ATVALOQVDCMZW          103        0.854369     5.826657\n",
+      "AZSDW7JJL5VA7          100        0.680000     2.118380\n",
+      "...                    ...             ...          ...\n",
+      "A3DGZIRDB1G0ZG           1        1.000000  1000.000000\n",
+      "A2E6DI8ZUSZLF3           1        0.000000     0.000000\n",
+      "A3CGUY769P63KQ           1        0.000000     0.000000\n",
+      "A1OM0RWOH90X1N           1        1.000000  1000.000000\n",
+      "A2Z03CBVWPF9IZ           1        1.000000  1000.000000\n",
+      "\n",
+      "[269 rows x 3 columns]\n",
+      "269\n"
+     ]
+    }
+   ],
+   "source": [
+    "def calculateOdds(p):\n",
+    "    \"\"\"Calculate odds ratio\"\"\"\n",
+    "    \"\"\"odds= p / 1.001-p   \"\"\"\n",
+    "    \n",
+    "    odds = p / (1.001 - p)\n",
+    "    \n",
+    "    return odds\n",
+    "\n",
+    "# Create odds column for rater_goodness dataframe\n",
+    "rater_goodness['odds'] = rater_goodness['avgCorrectness'].map(calculateOdds)\n",
+    "\n",
+    "\n",
+    "\n",
+    "print(rater_goodness)\n",
+    "print(len(rater_goodness))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q5 (10pts) Most Accurate Turks\n",
+    "List the top 10 most accurate turks who have rated at least 20 gold set URLs."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "                numRatings  avgCorrectness       odds\n",
+      "A2U0R4X38GUKZE          20        0.950000  18.627451\n",
+      "A22C0PJUBFJTI0          36        0.916667  10.869565\n",
+      "A23YQUBXZPKILZ          24        0.875000   6.944444\n",
+      "ATVALOQVDCMZW          103        0.854369   5.826657\n",
+      "A1HIXWH4OXT8S4          40        0.825000   4.687500\n",
+      "A3220HG1O83HQ4          22        0.818182   4.475385\n",
+      "A20PWAB7G3HDHU          20        0.800000   3.980100\n",
+      "A32W20KGQXS0LL          25        0.800000   3.980100\n",
+      "AJSJVK40F5HM6           28        0.785714   3.649635\n",
+      "A31OCN4MNHUQ6W         184        0.777174   3.472222\n",
+      "52\n"
+     ]
+    }
+   ],
+   "source": [
+    "rater_goodness_top10 = rater_goodness[rater_goodness['numRatings'] >= 20].sort_values('avgCorrectness', ascending=False)\n",
+    "rater_goodness_top10[:10]\n",
+    "\n",
+    "\n",
+    "print(rater_goodness_top10[:10])\n",
+    "print(len(rater_goodness_top10))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q6 (10pts) Rating Counts versus accuracy\n",
+    "One may imagine that a committed and accurate turk will rate lots of URLs.\n",
+    "On the other hand, perhaps it is only the spammers who have the time to\n",
+    "rate lots of URLs.\n",
+    "\n",
+    "Is number of ratings by a turker on gold set URLs related to his or her\n",
+    "accuracy? There's no fixed answer; just try to show some evidence for your\n",
+    "answer."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 432x288 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "                            OLS Regression Results                            \n",
+      "==============================================================================\n",
+      "Dep. Variable:                      y   R-squared:                       0.002\n",
+      "Model:                            OLS   Adj. R-squared:                 -0.002\n",
+      "Method:                 Least Squares   F-statistic:                    0.5488\n",
+      "Date:                Wed, 05 Aug 2020   Prob (F-statistic):              0.459\n",
+      "Time:                        23:19:31   Log-Likelihood:                -94.663\n",
+      "No. Observations:                 269   AIC:                             193.3\n",
+      "Df Residuals:                     267   BIC:                             200.5\n",
+      "Df Model:                           1                                         \n",
+      "Covariance Type:            nonrobust                                         \n",
+      "==============================================================================\n",
+      "                 coef    std err          t      P>|t|      [0.025      0.975]\n",
+      "------------------------------------------------------------------------------\n",
+      "const          0.6431      0.024     27.071      0.000       0.596       0.690\n",
+      "x1             0.0007      0.001      0.741      0.459      -0.001       0.002\n",
+      "==============================================================================\n",
+      "Omnibus:                       29.253   Durbin-Watson:                   1.969\n",
+      "Prob(Omnibus):                  0.000   Jarque-Bera (JB):               28.396\n",
+      "Skew:                          -0.731   Prob(JB):                     6.82e-07\n",
+      "Kurtosis:                       2.373   Cond. No.                         30.1\n",
+      "==============================================================================\n",
+      "\n",
+      "Warnings:\n",
+      "[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.\n",
+      "0.045292382804846903\n"
+     ]
+    }
+   ],
+   "source": [
+    "import matplotlib.pyplot as plt\n",
+    "import statsmodels.api as sm\n",
+    "\n",
+    "# Set X and Y\n",
+    "Y = rater_goodness['avgCorrectness'].values.reshape(-1,1)\n",
+    "X = rater_goodness['numRatings'].values.reshape(-1,1)\n",
+    "\n",
+    "# Add Constant\n",
+    "X = sm.add_constant(X)\n",
+    "\n",
+    "# Linear Model and Prediciton\n",
+    "model = sm.OLS(Y, X).fit()\n",
+    "predictions = model.predict(X) \n",
+    "\n",
+    "# Rest x,y for plotting\n",
+    "y = rater_goodness['avgCorrectness'].values\n",
+    "x = rater_goodness['numRatings'].values\n",
+    "\n",
+    "# Plotting\n",
+    "fig = plt.figure()\n",
+    "ax1 = fig.add_subplot(111)\n",
+    "plt.plot(x, predictions, c='r')\n",
+    "ax1.scatter(x, y)\n",
+    "plt.title('Num Ratings vs Average Correctness')\n",
+    "plt.xlabel('Number of Total Ratings')\n",
+    "plt.ylabel('Average Correctness')\n",
+    "plt.show()\n",
+    "\n",
+    "# Linear Model Summary\n",
+    "print(model.summary())\n",
+    "\n",
+    "print(rater_goodness['avgCorrectness'].corr(rater_goodness['numRatings']))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "I would argue that the number of ratings by a turk on Gold Set URLs is not related to thier accuracy. When running a simple linear regression using number of total ratings to predict average ratings, we find that the total number of ratings has a positive relationship with average correctness. The regression shows us that on average, ignoring all other factors, we would expect to see a .07% increase in average correctness for every number of total ratings.  However, the number of total ratings predictor is not statistically signficant with a T-Stat of 0.741. Therefore, although there appears to be a relationship between rating and number of ratings, because the statistic is not statistically significant we fail to reject the null hypothesis that the predictor has any impact on average rating. Additionally, when computing the correlation between averageAccuracy and numRatings we find that the two statistics have a very low correlation value (0.0453)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q7 (pts 13) Overall predicted odds\n",
+    "Consider each url *u* that is not in the gold set, and each category *c*. For the\n",
+    "pair (*u*, *c*), calculate the product of odds of all turks who (a) rated url *u* as\n",
+    "category *c*, and (b) have rated more gold set urls than 75% of all turks who\n",
+    "rated at least one gold-set url.\n",
+    "\n",
+    "For example, if you find that there are 269 turks who rated at least one\n",
+    "gold-set url, you want to select only the turks who have rated more gold-set\n",
+    "urls than 75% of these 269 turks. We can think of these as our \"reliable\"\n",
+    "turks. Now, our belief that url *u* belongs to category *c* depends on how many\n",
+    "\"reliable\" turks rated *u* as *c*; specifically, our belief is based on the product\n",
+    "of their reliability scores (i.e., their odds).\n",
+    "\n",
+    "We shall call such products of odds the *overall odds* henceforth."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 42,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "              turk  numRatings  avgCorrectness      odds\n",
+      "0   A31OCN4MNHUQ6W         184        0.777174  3.472222\n",
+      "1   A153PKAL7OAY36         148        0.722973  2.600369\n",
+      "2   A2BTR0GQ5B5JI6         126        0.523810  1.097695\n",
+      "3    ATVALOQVDCMZW         103        0.854369  5.826657\n",
+      "4    AZSDW7JJL5VA7         100        0.680000  2.118380\n",
+      "..             ...         ...             ...       ...\n",
+      "62   AC0YIZF6G5V9G          13        0.769231  3.318951\n",
+      "63   A8XTEV2JA6R2X          13        0.692308  2.242711\n",
+      "64  A1IB9WML70CU89          12        0.833333  4.970179\n",
+      "65   A4GP97LAQCCHJ          12        0.583333  1.396648\n",
+      "66  A35HNSSK5MHRAQ          11        0.636364  1.745201\n",
+      "\n",
+      "[67 rows x 4 columns]\n",
+      "                                           odds\n",
+      "url                         category           \n",
+      "http://0-101.net            G          2.155963\n",
+      "http://000.cc               G          1.460583\n",
+      "http://0000.jp              G         14.488244\n",
+      "http://000relationships.com G          9.914590\n",
+      "                            P          1.851852\n",
+      "14110\n"
+     ]
+    }
+   ],
+   "source": [
+    "import math\n",
+    "\n",
+    "# Calculate num of turks in 25 percentile\n",
+    "total = len(rater_goodness)\n",
+    "_25perc = math.floor(total*.25)\n",
+    "\n",
+    "# Get top 25% turks by number of ratings (at least one in gold set)\n",
+    "rater_goodness = rater_goodness.sort_values('numRatings', ascending=False)\n",
+    "rater_goodness_top25perc = rater_goodness[:_25perc]\n",
+    "rater_goodness_top25perc = rater_goodness_top25perc.reset_index()\n",
+    "rater_goodness_top25perc = rater_goodness_top25perc.rename(columns={'index': 'turk', \n",
+    "                                                                    'numRatings': 'numRatings', \n",
+    "                                                                    'avgCorrectness': 'avgCorrectness', \n",
+    "                                                                    'odds': 'odds'\n",
+    "                                                                   }\n",
+    "                                                          )\n",
+    "\n",
+    "print(rater_goodness_top25perc)\n",
+    "\n",
+    "# Top 25% turks by number of ratings and their respective ratings in non-goldset\n",
+    "labels_unkown_reliableTurks = pd.merge(rater_goodness_top25perc, labels_unknown , how='inner', on='turk')\n",
+    "\n",
+    "# Calculate odds for each category for each url (prod(turk odds for category))\n",
+    "groupedDF = labels_unkown_reliableTurks.groupby(['url', 'category'])[['odds']].prod()\n",
+    "\n",
+    "print(groupedDF.head())\n",
+    "print(len(groupedDF))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q8 (14pts) Predicted Categories\n",
+    "Create a DataFrame (called result_75, whose index is URLs not in the gold\n",
+    "set, and with two columns called top_category and top_odds. The top_category \n",
+    "should be the category with the highest overall odds for that url,\n",
+    "and the top_odds should be the overall odds for that top_category.\n",
+    "\n",
+    "These are our predictions, and the confidence we have in them (higher\n",
+    "overall odds implies greater confidence). If you want, you can check to see if\n",
+    "the predicted categories make sense."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 43,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "                            top_Category   top_Odds\n",
+      "url                                                \n",
+      "http://0-101.net                       G   2.155963\n",
+      "http://000.cc                          G   1.460583\n",
+      "http://0000.jp                         G  14.488244\n",
+      "http://000relationships.com            G   9.914590\n",
+      "http://000vitamins.com                 G   3.784982\n",
+      "10610\n"
+     ]
+    }
+   ],
+   "source": [
+    "'''\n",
+    "# Correct but inefficient\n",
+    "\n",
+    "urls_topCategory = {}\n",
+    "urls_topOdds = {}\n",
+    "for url in groupedDF.index.get_level_values(0):\n",
+    "    urls_topCategory[url] = groupedDF.loc[url,'odds'].idxmax()\n",
+    "    urls_topOdds[url] = groupedDF.loc[url,'odds'].max()\n",
+    "\n",
+    "urls_topCategory = pd.Series(urls_topCategory)\n",
+    "urls_topOdds = pd.Series(urls_topOdds)\n",
+    "\n",
+    "result_75 = pd.concat([urls_topCategory, urls_topOdds], axis=1)\n",
+    "result_75 = result_75.rename(columns={0: 'top_Category', \n",
+    "                                      1: 'top_Odds'\n",
+    "                                     }\n",
+    "                            )\n",
+    "'''\n",
+    "\n",
+    "\n",
+    "result_75 = groupedDF.reset_index().sort_values('odds', ascending=False).drop_duplicates(subset='url').sort_values('url')\n",
+    "result_75 = result_75.set_index('url')\n",
+    "result_75 = result_75.rename(columns={'category': 'top_Category', \n",
+    "                                      'odds': 'top_Odds'\n",
+    "                                     }\n",
+    "                            )\n",
+    "\n",
+    "result_75.head()\n",
+    "\n",
+    "# Testing\n",
+    "print(result_75.head())\n",
+    "print(len(result_75))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Q9 (14pts) Predicted categories using more turks\n",
+    "Questions 7 and 8 above only considered the ratings of turks who had rated\n",
+    "enough gold set URLs, so we were relatively more confident about their\n",
+    "accuracies. What happens if we loosen this restriction?\n",
+    "\n",
+    "Repeat the code of Q7 and Q8, but replacing 75% by 25% in the description \n",
+    "of Q7 (i.e., we also consider turks who have far fewer gold set ratings).\n",
+    "Call this result 25.\n",
+    "\n",
+    "Now let's see how these two results compare. Create a DataFrame where\n",
+    "both the index and the columns are the various categories, and the cells\n",
+    "contain the number of urls with these as the top categories according to\n",
+    "result 75 and result 25.\n",
+    "\n",
+    "For example, the cell corresponding to the row category=R and the column \n",
+    "category=G would be the number of URLs that were predicted to be\n",
+    "R by result 75 but predicted to be G by result 25.\n",
+    "\n",
+    "Where are the most errors?"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "G    8477\n",
+      "P    1057\n",
+      "X     701\n",
+      "R     465\n",
+      "Name: top_Category, dtype: int64\n",
+      "G    9231\n",
+      "P     527\n",
+      "X     439\n",
+      "R     205\n",
+      "Name: top_Category, dtype: int64\n",
+      "unreliableRatings     G    P    R    X\n",
+      "reliableRatings                       \n",
+      "G                  7964  733  277  257\n",
+      "P                   199  247   48   33\n",
+      "R                    38   30  103   34\n",
+      "X                    44    8   25  362\n"
+     ]
+    }
+   ],
+   "source": [
+    "import math\n",
+    "import numpy as np\n",
+    "\n",
+    "# Get 75% turks\n",
+    "total = len(rater_goodness)\n",
+    "_75perc = math.floor(269*.75)\n",
+    "rater_goodness = rater_goodness.sort_values('numRatings', ascending=False)\n",
+    "rater_goodness_top75perc = rater_goodness[:_75perc]\n",
+    "rater_goodness_top75perc = rater_goodness_top75perc.reset_index()\n",
+    "rater_goodness_top75perc = rater_goodness_top75perc.rename(columns={'index': 'turk', \n",
+    "                                                                    'numRatings': 'numRatings', \n",
+    "                                                                    'avgCorrectness': 'avgCorrectness', \n",
+    "                                                                    'odds': 'odds'\n",
+    "                                                                   }\n",
+    "                                                          )\n",
+    "\n",
+    "# Merge top 75% turks with unknown urls dataset\n",
+    "labels_unkown_unreliableTurks = pd.merge(rater_goodness_top75perc, labels_unknown, how='inner', on=['turk'])\n",
+    "\n",
+    "# Get odds\n",
+    "groupedDF = labels_unkown_unreliableTurks.groupby(['url', 'category'])[['odds']].prod()\n",
+    "result_25 = groupedDF.reset_index().sort_values('odds', ascending=False).drop_duplicates(subset='url').sort_values('url')\n",
+    "result_25 = result_25.set_index('url')\n",
+    "result_25 = result_25.rename(columns={'category': 'top_Category', \n",
+    "                                      'odds': 'top_Odds'\n",
+    "                                     }\n",
+    "                            )\n",
+    "\n",
+    "\n",
+    "# Put results_25 top_Category counts into series called top_Category_25\n",
+    "result_25_category_counts = result_25['top_Category'].value_counts()\n",
+    "result_25_category_counts = result_25_category_counts.rename('top_Category_25')\n",
+    "\n",
+    "# Put results_75 top_Category counts into series called top_Category_75\n",
+    "result_75_category_counts = result_75['top_Category'].value_counts()\n",
+    "result_75_category_counts = result_75_category_counts.rename('top_Category_75')\n",
+    "\n",
+    "comparisonTable = pd.merge(result_75, result_25, on = \"url\", how = \"inner\")\n",
+    "comparisonTable = comparisonTable[['top_Category_x', 'top_Category_y']]\n",
+    "comparisonTable = comparisonTable.rename(columns={'top_Category_x': 'reliableRatings', \n",
+    "                                                  'top_Category_y': 'unreliableRatings'\n",
+    "                                                 }\n",
+    "                                        )\n",
+    "\n",
+    "\n",
+    "print(result_25[\"top_Category\"].value_counts())\n",
+    "print(result_75[\"top_Category\"].value_counts())\n",
+    "#print(comparisonTable)\n",
+    "\n",
+    "comparisonTable[\"counts\"] = 1\n",
+    "predictedCategoriesPivotTable = pd.pivot_table(comparisonTable,\n",
+    "                                               index = \"reliableRatings\",\n",
+    "                                               columns = \"unreliableRatings\",\n",
+    "                                               values = \"counts\", \n",
+    "                                               aggfunc = sum\n",
+    "                                              )\n",
+    "\n",
+    "# Testing\n",
+    "print(predictedCategoriesPivotTable)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The most errors appear to be in the *G* category. Ideally the 'untrusted' (75 perc) turks would predict the same results as the 'trusted' turks. If this were the case, we would expect the diagonal of the matrix/dataframe to contain the most values, as the diagonal cells are the cells where both groups predicted the same rating for urls. However, we see that the rating *G* is overpredicted, with the cells with higher values being located in the row/column associated with the *G* category."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
